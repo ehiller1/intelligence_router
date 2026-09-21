@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/routing_requested.schema.json",
+  "title": "ir.routing.requested",
+  "description": "Decision D-interface (Trust Architecture §3.2): the ReasoningRequest contract. Deliberately has NO model, governance_tier, privacy_class, or actor field -- a field that does not exist cannot be under-declared (FR-IRG-FND-05). Caller identity comes from the workload certificate at the transport layer, never from this payload.",
+  "type": "object",
+  "required": ["reasoning_class", "task_ref", "idempotency_key"],
+  "properties": {
+    "reasoning_class": { "type": "string", "minLength": 1, "description": "Must be a class registered in ir_reasoning_classes (FR-IRG-FND-01); never a concrete model id (FR-IRG-FND-04)." },
+    "task_ref": { "type": "string", "minLength": 1, "description": "Workflow/run id. Router-side task taint (FR-IRG-INT-02) accumulates here; the agent cannot edit this record." },
+    "input": {
+      "type": "object",
+      "description": "Content, or immutable mesh event references -- never a raw payload duplicated into router stores (FR-IRG-STT-03).",
+      "properties": {
+        "content_ref": { "type": "string" },
+        "content_hash": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "hints": {
+      "type": "object",
+      "description": "Tighten-only hints. A hint may raise the effective governance/privacy floor; it can never lower it (decision: declared vs derived, Trust Architecture §1).",
+      "properties": {
+        "min_governance_tier": { "type": "string", "enum": ["commodity", "normative", "guider"] },
+        "min_privacy_class": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] }
+      },
+      "additionalProperties": false
+    },
+    "budgets": {
+      "type": "object",
+      "properties": {
+        "cost_ceiling_per_1k_tokens": { "type": "number", "minimum": 0 },
+        "latency_ceiling_ms": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "idempotency_key": { "type": "string", "minLength": 1 },
+    "override": {
+      "type": "object",
+      "description": "Present only for the admin source in the MVP (FR-IRG-FND-04); template arrives with the Adaptive track (decision R5). Absent for ordinary agent calls.",
+      "required": ["model_id", "source"],
+      "properties": {
+        "model_id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "enum": ["admin", "template"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

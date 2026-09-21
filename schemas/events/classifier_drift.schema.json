@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/classifier_drift.schema.json",
+  "title": "ir.classifier.drift",
+  "description": "FR-IRG-CLS-05, amended in v0.2 to require a lineage-diverse comparator (decision D3): inter-instance agreement fell below threshold.",
+  "type": "object",
+  "required": ["primary_model_id", "comparator_model_id", "agreement", "threshold"],
+  "properties": {
+    "primary_model_id": { "type": "string", "minLength": 1 },
+    "comparator_model_id": { "type": "string", "minLength": 1 },
+    "agreement": { "type": "number", "minimum": 0, "maximum": 1 },
+    "threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+    "sample_window": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

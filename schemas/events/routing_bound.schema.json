@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/routing_bound.schema.json",
+  "title": "ir.routing.bound",
+  "description": "A binding issued. Carries the ELIGIBLE SET and the selected model separately (decision D2) -- the cache/provenance object is the eligible set; selection is a per-request result over it.",
+  "type": "object",
+  "required": [
+    "decision_id", "reasoning_class", "eligible_model_ids", "selected_model_id",
+    "governance_tier", "privacy_class", "governance_policy_version", "stamp"
+  ],
+  "properties": {
+    "decision_id": { "type": "string", "minLength": 1 },
+    "reasoning_class": { "type": "string", "minLength": 1 },
+    "eligible_model_ids": {
+      "type": "array", "items": { "type": "string" }, "minItems": 1,
+      "description": "Hard stop no_eligible_model means this event is never emitted with an empty array -- an empty set is a ledgered refusal instead (FR-IRG-APV-02)."
+    },
+    "selected_model_id": { "type": "string", "minLength": 1 },
+    "governance_tier": { "type": "string", "enum": ["commodity", "normative", "guider"] },
+    "privacy_class": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
+    "posture": { "type": "string", "enum": ["normal", "watch", "restricted", "quarantined"] },
+    "governance_policy_version": { "type": "string", "minLength": 1 },
+    "selection_policy_version": { "type": ["string", "null"], "description": "Null until the Adaptive track's learned selector is live (AD-4)." },
+    "calibration_state_version": { "type": ["string", "null"] },
+    "override_source": { "type": ["string", "null"], "enum": ["admin", "template", null] },
+    "override_refused_reason": { "type": ["string", "null"] },
+    "signals": {
+      "type": "array", "items": { "type": "string" },
+      "description": "The tightening/classification signals that influenced this decision (FR-IRG-RTR-04)."
+    },
+    "stamp": {
+      "type": "object",
+      "description": "Decision D-stamp / FR-IRG-INT-01: signed by the dispatch plane. Default-deny -- the egress gate refuses content without a valid stamp.",
+      "required": ["decision_id", "output_hash", "governance_tier", "privacy_class", "signature"],
+      "properties": {
+        "decision_id": { "type": "string" },
+        "output_hash": { "type": "string" },
+        "governance_tier": { "type": "string", "enum": ["commodity", "normative", "guider"] },
+        "privacy_class": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
+        "verdict_id": { "type": ["string", "null"], "description": "Present when governance_tier requires a guider verdict; null for commodity." },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "signature": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

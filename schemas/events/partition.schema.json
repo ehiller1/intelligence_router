@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/partition.schema.json",
+  "title": "ir.partition.entered / ir.partition.cleared",
+  "description": "Decision D4: the sidecar proves connectivity via a signed, continuously-renewed governance lease rather than detecting the partition's absence (Trust Architecture §5). .entered fires on lease expiry; .cleared fires on lease re-issue. Shared schema for both event types -- distinguished by the envelope's `type` field.",
+  "type": "object",
+  "required": ["sidecar_id", "governance_lease_id"],
+  "properties": {
+    "sidecar_id": { "type": "string", "minLength": 1 },
+    "governance_lease_id": { "type": "string", "minLength": 1 },
+    "lease_interval_seconds": { "type": ["number", "null"], "minimum": 0 }
+  },
+  "additionalProperties": false
+}

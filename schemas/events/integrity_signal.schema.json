@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/integrity_signal.schema.json",
+  "title": "ir.integrity.*",
+  "description": "Trust Architecture §6.1: the 14 workaround-attempt signals, emitted ONLY by platform components (Zone M/G) and attributed by workload certificate -- never by a payload field, so one principal cannot frame another (threat T14). `principal` is populated from the caller's mTLS identity at the transport layer by the emitting component, not supplied by the agent whose behavior triggered the signal.",
+  "type": "object",
+  "required": ["signal_type", "principal", "decision_id"],
+  "properties": {
+    "signal_type": {
+      "type": "string",
+      "enum": [
+        "stamp_missing", "stamp_invalid", "verdict_replay",
+        "ingress_egress_divergence", "fragmentation_suspected",
+        "class_content_mismatch", "probe_suspected", "resubmit_after_hold",
+        "perturbation_mislabel", "override_refused", "manifest_violation",
+        "direct_endpoint_attempt", "mesh_acl_denied", "guider_injection_suspected"
+      ]
+    },
+    "principal": {
+      "type": "string", "minLength": 1,
+      "description": "The workload identity this signal is attributed to, from the mTLS certificate presented on the offending call -- never from a request payload field (defeats threat T14, framing another agent)."
+    },
+    "decision_id": { "type": ["string", "null"] },
+    "detail": { "type": ["string", "null"] },
+    "weight_applied": { "type": ["number", "null"], "description": "The signal's current weight in the suspicion-score formula (Trust Architecture §6.1); null if not yet scored." }
+  },
+  "additionalProperties": false
+}

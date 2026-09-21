@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/routing_tier_tightened.schema.json",
+  "title": "ir.routing.tier.tightened",
+  "description": "Decision R4: renamed from the MVP FRD's route.escalated. A monotonic tighten fired -- 'escalation' is reserved for a cascade hop (ir.routing.escalation.triggered, Adaptive track only). from_tier must be strictly less than to_tier; the type-level guarantee is in ir_core.types.tighten().",
+  "type": "object",
+  "required": ["decision_id", "from_tier", "to_tier", "trigger"],
+  "properties": {
+    "decision_id": { "type": "string", "minLength": 1 },
+    "from_tier": { "type": "string", "enum": ["commodity", "normative", "guider"] },
+    "to_tier": { "type": "string", "enum": ["commodity", "normative", "guider"] },
+    "trigger": {
+      "type": "string",
+      "enum": ["ethical_load", "privacy_class", "low_confidence", "posture_floor", "hint"],
+      "description": "low_confidence = FR-IRG-CLS-04; posture_floor = a restricted-posture principal's governance-tier floor (FR-IRG-INT-05)."
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/governance_policy_promoted.schema.json",
+  "title": "ir.governance.policy.promoted",
+  "description": "Decision R3: distinct from the Adaptive FRD's ir.routing.policy.promoted (that one is the learned SELECTION policy). This event is the signed, human-promoted governance policy -- classes, eligibility, tiering, tightening map, bands. Sidecars converge to `version` and revoke bindings issued under the previous version.",
+  "type": "object",
+  "required": ["version", "domain_id", "approver", "signature"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "domain_id": { "type": "string", "minLength": 1 },
+    "approver": { "type": "string", "minLength": 1, "description": "The Domain Authority's identity (FR-IRG-KEY-01: signing requires their own hardware token)." },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "signature": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

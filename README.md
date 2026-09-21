@@ -24,53 +24,101 @@ themselves; loosening is always a human act. See `docs/TRUST_ARCHITECTURE.md`
 
 ## Status
 
-**MVP-0 in progress.** `ir_core` — the pure-library lattice types, the
-eligibility resolver, and the distillation privacy gate — is built and
-tested (38 tests, `pytest ir_core`). This is deliberately the first thing
-built: no I/O, no infrastructure decisions, and every hard stop in the
-autonomy ladder has an executable test before any service code exists.
+**MVP-0 complete: 106/106 tests passing.**
 
-Remaining MVP-0 work (needs infrastructure decisions — see
-`docs/IMPLEMENTATION_PLAN.md` §8 "Decisions still open"):
-- PostgreSQL migrations (schema is specified in `docs/IMPLEMENTATION_PLAN.md`
-  and the Implementation Guide sent alongside this repo)
-- Control plane API (signed governance-policy store, atomic promotion)
-- JSON Schemas for the `ir.*` CloudEvents envelope
+- `ir_core` — pure-library lattice types, the eligibility resolver, and the
+  distillation privacy gate. No I/O, no infrastructure decisions. Every
+  hard stop in the autonomy ladder has an executable test.
+- `schemas/` — JSON Schemas for every `ir.*` CloudEvents event, closing the
+  MVP FRD's payload-schema `[ORCHESTRATOR-GAP]`. Tests confirm each schema
+  is well-formed and reject the specific invalid cases the FRDs call out by
+  name (a `routing.requested` payload with a smuggled `model` field, an
+  event missing `env`, a posture loosen from `restricted` with no approver,
+  etc.).
+- `ir_controlplane/` — the signed governance-policy store: Ed25519
+  signing/verification, atomic promotion (verified under real concurrent
+  load with `ThreadPoolExecutor`, not just a unit test), and a thin FastAPI
+  HTTP layer. SQL migrations are hand-verified against `ir_core.types`
+  (every enum-shaped `CHECK` constraint is tested to match the Python
+  lattice types exactly) but **not yet run against a live Postgres** — see
+  `ir_controlplane/migrations/README.md` for why (this sandbox cannot run
+  Postgres at all: it needs a `shmget` syscall the sandbox blocks
+  unconditionally, even in `shared_memory_type=mmap` mode).
+
+**A real concurrency bug was found and fixed during this build**, not
+hypothesized: an initial `is_active` implementation stored it as an
+independent flag flipped in two writes (deactivate old, activate new) under
+a per-domain lock. The writes were correctly serialized, but an
+unsynchronized reader scanning many versions could see a stale "true" left
+from before a deactivation alongside a fresh "true" from after a different
+activation — an apparent two-active-versions state that never actually
+existed at any single instant. Fixed by making `is_active` a derived fact
+read fresh from one atomic pointer (`ir_controlplane/store.py`'s class
+docstring has the full account, including the Postgres-equivalent lesson:
+promotion must be one `UPDATE` statement per domain, not two).
+
+**Not yet built** (see `docs/IMPLEMENTATION_PLAN.md` for MVP-1 through
+MVP-5, then the Adaptive track): the resolution engine's live service
+wrapper (the logic exists in `ir_core.resolution`; MVP-1 wires it to real
+model registry data and event handling), the classifier, the sidecar, the
+guider service, the dispatch plane, the egress gate, and everything after.
 
 ## Repo layout
 
 ```
-ir_core/            pure library, no I/O — lattice types, eligibility,
-                     resolution, lineage, distillation gating, TTL/posture
-                     formulas. Everything else depends on this; this depends
-                     on nothing else in the repo.
-  types.py           GovernanceTier, PrivacyClass, Posture, LineageSet,
-                     EligibilityBinding, tighten(), may_receive(), ttl_eff()
-  resolution.py      class -> eligible set -> (override ->) selection
-  distillation.py    privacy gating + export-ceiling hard stop for the
-                     distillation flywheel (Adaptive FRD, out of MVP scope
-                     but the gate belongs here so it exists before the
-                     flywheel does)
-  exceptions.py      HardStop — every blocked autonomy-ladder action raises
-                     this with a stable `code`
-  tests/             one property-test module (test_types.py) and one
-                     hard-stop-per-requirement module (test_hard_stops.py)
+ir_core/             pure library, no I/O — lattice types, eligibility,
+                      resolution, lineage, distillation gating, TTL/posture
+                      formulas. Everything else depends on this; this
+                      depends on nothing else in the repo.
+  types.py            GovernanceTier, PrivacyClass, Posture, LineageSet,
+                      EligibilityBinding, tighten(), may_receive(), ttl_eff()
+  resolution.py       class -> eligible set -> (override ->) selection
+  distillation.py     privacy gating + export-ceiling hard stop for the
+                      distillation flywheel
+  exceptions.py       HardStop — every blocked autonomy-ladder action
+                      raises this with a stable `code`
+  tests/              property tests (test_types.py) + one test per hard
+                      stop (test_hard_stops.py) — 38 tests
 
-docs/                the design documents this code implements
+schemas/              JSON Schema (Draft 2020-12) for the CloudEvents
+                      envelope and every ir.* event payload
+  envelope.schema.json           mandatory `env`, sim requires `run_id`
+  events/*.schema.json           one file per event type (or shared, for
+                                  the 14 ir.integrity.* signals)
+  registry.py                    event type -> schema file lookup
+  tests/test_schemas.py          well-formed + accepts/rejects the specific
+                                  cases the FRDs call out — 29 tests
+
+ir_controlplane/      signed governance-policy store + HTTP API
+  signing.py           Ed25519 sign/verify (HSM integration point — see
+                       the module docstring for what NOT to do in prod)
+  store.py             PolicyStore interface + InMemoryPolicyStore
+                       (atomic promotion via one lock per domain)
+  service.py           GovernanceControlPlane — ties signing + store +
+                       HardStop together; emits the promoted-event payload
+  app.py               thin FastAPI wrapper; stateless, replica-safe
+  migrations/           numbered SQL DDL (hand-verified, not yet run
+                       against live Postgres — see migrations/README.md)
+  tests/               signing round-trips, promotion incl. forged-
+                       signature refusal, HTTP marshalling, migration/
+                       ir_core.types consistency, and real-thread
+                       concurrency (ThreadPoolExecutor, 50 workers,
+                       20 repeated runs) — 39 tests
+
+docs/                 the design documents this code implements
 ```
 
 Planned, not yet built (see `docs/IMPLEMENTATION_PLAN.md` for the full
 phase breakdown, MVP-1 through MVP-5, then the Adaptive track AD-1..6):
 
 ```
-ir_controlplane/     signed governance-policy store, atomic promotion
 ir_sidecar/          per-membrane resolver, governance lease, binding cache
 ir_classifier/       ethical-load + privacy classifier, golden set, drift
 ir_dispatch/         sole holder of model credentials; signs output stamps
 ir_egress/           Publisher + Card/blackboard hooks; default-deny gate
 ir_guider/           guider dispatch, deterministic signer, rule canaries
 ir_attest/           attestation schema, verify lib, issuance CLI
-ir_ledger/           hash-chained Decision Ledger
+ir_ledger/           hash-chained Decision Ledger writer
 ir_posture/          integrity signals, suspicion score, posture, TTL
 ir_registry/         dynamic membrane + Card-type registration
 ir_conformance/      the attack-suite kit modules run in CI to certify
@@ -81,8 +129,8 @@ ir_console/          operator console, hold queue
 
 ```bash
 python3 -m venv .venv
-./.venv/bin/pip install pytest hypothesis
-./.venv/bin/python -m pytest -v
+./.venv/bin/pip install -r requirements.txt
+./.venv/bin/python -m pytest -v   # 106 tests
 ```
 
 If pip's TLS handshake fails behind a corporate/sandboxed proxy with an

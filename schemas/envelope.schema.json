@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/envelope.schema.json",
+  "title": "IR CloudEvents Envelope",
+  "description": "Decision R9: every ir.* event uses the CloudEvents envelope in the ir.* namespace with a mandatory `env` attribute. Consumers reject events missing `env` rather than defaulting (FR-IR-TRN-02, patched into the MVP FRD as FR-IRG-TRN-01/02). `data` is validated separately against the per-event-type schema in schemas/events/.",
+  "type": "object",
+  "required": ["specversion", "id", "source", "type", "time", "env", "data"],
+  "properties": {
+    "specversion": { "const": "1.0" },
+    "id": { "type": "string", "minLength": 1, "description": "Unique per event; used for idempotent consumer dedup (FR-IR-LRN-06: dedupe on decision_id + signal_type at the consumer level, this id at the transport level)." },
+    "source": { "type": "string", "format": "uri-reference", "description": "The emitting component's workload identity, e.g. 'urn:ir:dispatch-plane' or 'urn:ir:sidecar:<membrane_id>'." },
+    "type": {
+      "type": "string",
+      "pattern": "^ir\\.[a-z]+(\\.[a-z_]+)*$",
+      "description": "Decision R9 naming: ir.routing.requested, ir.routing.bound, ir.routing.tier.tightened, ir.routing.outcome.observed, ir.routing.escalation.triggered (Adaptive-track only, decision R4), ir.guider.hold, ir.attestation.failed, ir.classifier.drift, ir.governance.policy.promoted, ir.partition.entered, ir.partition.cleared, ir.integrity.*, ir.posture.changed."
+    },
+    "time": { "type": "string", "format": "date-time" },
+    "datacontenttype": { "const": "application/json" },
+    "env": {
+      "type": "string",
+      "enum": ["prod", "shadow", "sim"],
+      "description": "Mandatory (decision R9 / FR-IR-TRN-02). MVP emits 'prod' only; 'shadow' and 'sim' are reserved for the Adaptive track (AD-2/AD-5) so isolation is testable before that code exists (Trust Architecture, note on R9)."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Required when env=sim (Adaptive FRD FR-IR-TRN-02); absent otherwise.",
+      "minLength": 1
+    },
+    "data": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "env": { "const": "sim" } } },
+      "then": { "required": ["run_id"] }
+    }
+  ],
+  "additionalProperties": true
+}

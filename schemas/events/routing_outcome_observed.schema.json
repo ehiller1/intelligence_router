@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/routing_outcome_observed.schema.json",
+  "title": "ir.routing.outcome.observed",
+  "description": "Decision D7: emitted from MVP-4 for guider verdicts and human hold resolutions -- the wide decision record's outcome side is built during the MVP rather than deferred to the Adaptive track's AD-1.",
+  "type": "object",
+  "required": ["decision_id", "signal_type", "verdict"],
+  "properties": {
+    "decision_id": { "type": "string", "minLength": 1 },
+    "signal_type": { "type": "string", "enum": ["guider", "human"] },
+    "verdict": {
+      "type": "string",
+      "description": "guider: pass|fail|unavailable|uncertain (FR-IRG-GDR-04). human: approve|edit|reject (hold-queue resolution, FR-IRG-UI-03).",
+      "enum": ["pass", "fail", "unavailable", "uncertain", "approve", "edit", "reject"]
+    },
+    "score": { "type": ["number", "null"] },
+    "latency_ms": { "type": ["integer", "null"], "minimum": 0 },
+    "label": {
+      "type": ["string", "null"],
+      "enum": ["confirmed_workaround", "benign_defect", "false_signal", null],
+      "description": "Human label on an integrity review resolved alongside this outcome (Trust Architecture §6.4); only present for signal_type=human resolutions tied to an integrity hold."
+    }
+  },
+  "additionalProperties": false
+}

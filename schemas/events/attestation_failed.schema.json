@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/attestation_failed.schema.json",
+  "title": "ir.attestation.failed",
+  "description": "FR-IRG-ATT-01/03: a model was rejected for missing, expired, invalid, or withdrawn attestation. Consumers use this to revoke dependent eligibility bindings (FR-IRG-RTR-05).",
+  "type": "object",
+  "required": ["model_id", "reason"],
+  "properties": {
+    "model_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "enum": ["missing", "expired", "invalid_signature", "withdrawn"] },
+    "attestation_id": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

@@ -5,7 +5,7 @@ description = "Governed, tiered model routing for the AOM substrate (FR-IRG-* / 
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
-testpaths = ["ir_core"]
+testpaths = ["ir_core", "schemas", "ir_controlplane"]
 python_files = ["test_*.py"]
 
 [build-system]
@@ -13,4 +13,4 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["ir_core"]
+packages = ["ir_core", "schemas", "ir_controlplane"]

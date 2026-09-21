@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intelligence-router.internal/schemas/events/guider_hold.schema.json",
+  "title": "ir.guider.hold",
+  "description": "FR-IRG-GDR-04: governed task held for a human. reason=fail is new in v0.2 (previously only unavailable/uncertain); in the MVP a fail verdict always holds, from the Adaptive track's AD-3 onward it triggers a cascade hop first and only holds after maxEscalations.",
+  "type": "object",
+  "required": ["decision_id", "governance_tier", "reason"],
+  "properties": {
+    "decision_id": { "type": "string", "minLength": 1 },
+    "governance_tier": { "type": "string", "enum": ["normative", "guider"] },
+    "reason": { "type": "string", "enum": ["unavailable", "uncertain", "fail"] },
+    "guider_model_id": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}
