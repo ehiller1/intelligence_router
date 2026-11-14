@@ -24,7 +24,17 @@ themselves; loosening is always a human act. See `docs/TRUST_ARCHITECTURE.md`
 
 ## Status
 
-**MVP-0 complete: 106/106 tests passing.**
+**MVP-0 complete, plus a minimal dispatch: 126/126 tests passing.**
+
+- `ir_dispatch` (minimal, ahead of MVP-1) — takes an `EligibilityBinding`,
+  drops eligible models that have no `ServingEndpoint`, selects over the rest
+  with the existing `apply_override` / lowest-cost rule, and makes one
+  OpenAI-compatible `/v1/chat/completions` call with
+  `model=<served_model_name>`. For distilled students that name is the LoRA
+  adapter on a shared vLLM server, so several experts can share one
+  deployment of their base model. Selection only ever runs over a subset of the
+  binding. Not yet: stamp signing, emitting `ir.routing.bound` (the result
+  returns its fields), retries/fallback, streaming.
 
 - `ir_core` — pure-library lattice types, the eligibility resolver, and the
   distillation privacy gate. No I/O, no infrastructure decisions. Every
@@ -72,7 +82,8 @@ ir_core/             pure library, no I/O — lattice types, eligibility,
                       depends on nothing else in the repo.
   types.py            GovernanceTier, PrivacyClass, Posture, LineageSet,
                       EligibilityBinding, tighten(), may_receive(), ttl_eff()
-  resolution.py       class -> eligible set -> (override ->) selection
+  resolution.py       class -> eligible set -> (override ->) selection;
+                      ModelRecord, ServingEndpoint (where a model answers)
   distillation.py     privacy gating + export-ceiling hard stop for the
                       distillation flywheel
   exceptions.py       HardStop — every blocked autonomy-ladder action
@@ -88,6 +99,14 @@ schemas/              JSON Schema (Draft 2020-12) for the CloudEvents
   registry.py                    event type -> schema file lookup
   tests/test_schemas.py          well-formed + accepts/rejects the specific
                                   cases the FRDs call out — 29 tests
+
+ir_dispatch/          minimal dispatch plane (see Status)
+  dispatch.py          Dispatcher: binding -> servable subset -> selection
+                       -> POST /v1/chat/completions; DispatchError codes
+  tests/               selection never leaves the binding, overrides,
+                       credentials only over https, endpoint failures, the
+                       ir.routing.bound payload, and a real-HTTP fake vLLM
+                       with two LoRA experts on one server
 
 ir_controlplane/      signed governance-policy store + HTTP API
   signing.py           Ed25519 sign/verify (HSM integration point — see
@@ -114,7 +133,7 @@ phase breakdown, MVP-1 through MVP-5, then the Adaptive track AD-1..6):
 ```
 ir_sidecar/          per-membrane resolver, governance lease, binding cache
 ir_classifier/       ethical-load + privacy classifier, golden set, drift
-ir_dispatch/         sole holder of model credentials; signs output stamps
+ir_dispatch/         (minimal version exists) stamp signing, retries, streaming
 ir_egress/           Publisher + Card/blackboard hooks; default-deny gate
 ir_guider/           guider dispatch, deterministic signer, rule canaries
 ir_attest/           attestation schema, verify lib, issuance CLI
@@ -130,7 +149,7 @@ ir_console/          operator console, hold queue
 ```bash
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
-./.venv/bin/python -m pytest -v   # 106 tests
+./.venv/bin/python -m pytest -v   # 126 tests
 ```
 
 If pip's TLS handshake fails behind a corporate/sandboxed proxy with an
