@@ -15,11 +15,13 @@ eligible set, never a way around it (decision R5).
 """
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import FrozenSet, Optional
+from urllib.parse import urlparse
 
-from ir_core.exceptions import HardStop
+from ir_core.exceptions import HardStop, ValidationError
 from ir_core.types import (
     EligibilityBinding,
     EligibilityBindingKey,
@@ -31,9 +33,60 @@ from ir_core.types import (
 )
 
 
+#: The only wire protocol dispatch speaks today: an OpenAI-compatible
+#: ``/v1/chat/completions`` (vLLM serves this for a base model and every
+#: LoRA adapter loaded on it).
+ENDPOINT_API_OPENAI_CHAT = "openai-chat"
+
+
+@dataclass(frozen=True)
+class ServingEndpoint:
+    """
+    Where a model answers (FND-02 ``deployment_endpoint``). Data only: ir_core
+    does no I/O, ir_dispatch makes the call.
+
+    ``served_model_name`` is what goes in the request's ``model`` field. For a
+    distilled student it is the LoRA adapter's name on the vLLM server, which
+    is how many experts share one base-model deployment.
+
+    No credential is held here. ir_dispatch is the sole holder of model
+    credentials and looks them up by model_id.
+    """
+    base_url: str
+    served_model_name: str
+    api: str = ENDPOINT_API_OPENAI_CHAT
+
+    def __post_init__(self) -> None:
+        u = urlparse(self.base_url)
+        if u.scheme not in ("http", "https") or not u.hostname:
+            raise ValidationError(f"endpoint base_url must be an http(s) URL: {self.base_url!r}")
+        if u.path not in ("", "/") or u.query or u.fragment:
+            raise ValidationError("endpoint base_url is the server root; dispatch adds the path")
+        if u.scheme == "http" and not _is_private_host(u.hostname):
+            raise ValidationError(
+                f"plain http is allowed only to a private host, not {u.hostname!r}")
+        if not self.served_model_name:
+            raise ValidationError("endpoint needs a served_model_name")
+        if self.api != ENDPOINT_API_OPENAI_CHAT:
+            raise ValidationError(f"unsupported endpoint api {self.api!r}")
+
+
+def _is_private_host(host: str) -> bool:
+    """A private IP, localhost, or a cluster-internal name. Mirrors RLDE's rule."""
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return host == "localhost" or host.endswith((".internal", ".svc"))
+
+
 @dataclass(frozen=True)
 class ModelRecord:
-    """Minimal registry entry (MVP FRD FND-02) needed for eligibility."""
+    """Minimal registry entry (MVP FRD FND-02) needed for eligibility.
+
+    ``endpoint`` plays no part in eligibility. A model with no endpoint can
+    still be eligible (registered but not deployed); dispatch refuses to call
+    it rather than resolution hiding it.
+    """
     model_id: str
     privacy_ceiling: PrivacyClass
     lineage: LineageSet
@@ -41,6 +94,7 @@ class ModelRecord:
     is_attested: bool
     attestation_valid_until: Optional[datetime]
     supported_classes: FrozenSet[str]
+    endpoint: Optional[ServingEndpoint] = None
 
     def attestation_ok(self, now: Optional[datetime] = None) -> bool:
         if not self.is_attested:
