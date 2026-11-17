@@ -11,8 +11,8 @@ Implementation Guide's "MVP-0 exit criterion": all hard stops covered.
     5.  guider tier accepts no overrides, from any source
     6.  override source not in the permitted set (agents cannot pin models)
     7.  guider lineage must be disjoint from the model it oversees
-    8.  distillation candidate: P3 content excluded absolutely
-    9.  distillation candidate: P2 without consent+Redactor excluded
+    8.  distillation candidate: P0 (most sensitive) content excluded absolutely
+    9.  distillation candidate: P1 without consent+Redactor excluded
     10. distillation export: dataset class must not exceed destination ceiling
     11. no automatic relaxation path exists for governance-tier or posture
 """
@@ -37,7 +37,7 @@ FUTURE = NOW + timedelta(days=30)
 PAST = NOW - timedelta(days=1)
 
 
-def _model(model_id, ceiling=PrivacyClass.P3, lineage="fam-a", cost=1.0,
+def _model(model_id, ceiling=PrivacyClass.P0, lineage="fam-a", cost=1.0,
            attested=True, valid_until=FUTURE):
     return ModelRecord(
         model_id=model_id,
@@ -60,11 +60,11 @@ def test_hard_stop_no_eligible_model():
         default_governance_tier=GovernanceTier.NORMATIVE,
         eligible_model_ids=frozenset({"model-a"}),
     )
-    # model-a's ceiling (P1) cannot receive P3 data -> eligible set is empty
-    models = {"model-a": _model("model-a", ceiling=PrivacyClass.P1)}
+    # model-a's ceiling (P2) cannot receive P1 data -> eligible set is empty
+    models = {"model-a": _model("model-a", ceiling=PrivacyClass.P2)}
     with pytest.raises(HardStop) as exc:
         build_binding(
-            rc, models, GovernanceTier.NORMATIVE, PrivacyClass.P3,
+            rc, models, GovernanceTier.NORMATIVE, PrivacyClass.P0,
             Posture.NORMAL, "gov-v1", ttl_seconds=60, now=NOW,
         )
     assert exc.value.code == "no_eligible_model"
@@ -102,7 +102,7 @@ def test_hard_stop_unattested_model_excluded_from_governed_tier():
         "unattested": _model("unattested", attested=False, valid_until=None),
         "attested": _model("attested", attested=True, valid_until=FUTURE),
     }
-    eligible = resolve_eligible_set(rc, models, GovernanceTier.NORMATIVE, PrivacyClass.P2, now=NOW)
+    eligible = resolve_eligible_set(rc, models, GovernanceTier.NORMATIVE, PrivacyClass.P1, now=NOW)
     assert eligible == frozenset({"attested"})
 
 
@@ -113,7 +113,7 @@ def test_hard_stop_expired_attestation_excluded_from_governed_tier():
         eligible_model_ids=frozenset({"expired"}),
     )
     models = {"expired": _model("expired", attested=True, valid_until=PAST)}
-    eligible = resolve_eligible_set(rc, models, GovernanceTier.NORMATIVE, PrivacyClass.P1, now=NOW)
+    eligible = resolve_eligible_set(rc, models, GovernanceTier.NORMATIVE, PrivacyClass.P2, now=NOW)
     assert eligible == frozenset()
 
 
@@ -125,22 +125,22 @@ def test_attestation_not_required_for_commodity_tier():
         eligible_model_ids=frozenset({"unattested"}),
     )
     models = {"unattested": _model("unattested", attested=False, valid_until=None)}
-    eligible = resolve_eligible_set(rc, models, GovernanceTier.COMMODITY, PrivacyClass.P0, now=NOW)
+    eligible = resolve_eligible_set(rc, models, GovernanceTier.COMMODITY, PrivacyClass.P3, now=NOW)
     assert eligible == frozenset({"unattested"})
 
 
 # ---------------------------------------------------------------------------
-# 4. Privacy ceiling: P3 content never reaches a model with a lower ceiling.
+# 4. Privacy ceiling: P0 (most sensitive) content never reaches a lower-ceiling model.
 # ---------------------------------------------------------------------------
 
-def test_hard_stop_p3_data_never_reaches_low_ceiling_model():
+def test_hard_stop_p0_data_never_reaches_low_ceiling_model():
     rc = ReasoningClassRecord(
         name="commodity_extraction",
         default_governance_tier=GovernanceTier.COMMODITY,
         eligible_model_ids=frozenset({"vendor-frontier"}),
     )
-    models = {"vendor-frontier": _model("vendor-frontier", ceiling=PrivacyClass.P0)}
-    eligible = resolve_eligible_set(rc, models, GovernanceTier.COMMODITY, PrivacyClass.P3, now=NOW)
+    models = {"vendor-frontier": _model("vendor-frontier", ceiling=PrivacyClass.P3)}
+    eligible = resolve_eligible_set(rc, models, GovernanceTier.COMMODITY, PrivacyClass.P0, now=NOW)
     assert eligible == frozenset()
 
 
@@ -223,13 +223,13 @@ def test_hard_stop_distilled_worker_inherits_teachers_lineage():
     """
     guider_lineage = LineageSet.for_base_model("frontier-a")
     guider = ModelRecord(
-        model_id="guider-1", privacy_ceiling=PrivacyClass.P3, lineage=guider_lineage,
+        model_id="guider-1", privacy_ceiling=PrivacyClass.P0, lineage=guider_lineage,
         cost_per_1k_tokens=99.0, is_attested=True, attestation_valid_until=FUTURE,
         supported_classes=frozenset(),
     )
     distilled_lineage = LineageSet.for_base_model("oss-13b").derive(teacher_lineages=(guider_lineage,))
     distilled_worker = ModelRecord(
-        model_id="worker-distilled", privacy_ceiling=PrivacyClass.P3, lineage=distilled_lineage,
+        model_id="worker-distilled", privacy_ceiling=PrivacyClass.P0, lineage=distilled_lineage,
         cost_per_1k_tokens=0.1, is_attested=True, attestation_valid_until=FUTURE,
         supported_classes=frozenset(),
     )
@@ -243,27 +243,27 @@ def test_hard_stop_distilled_worker_inherits_teachers_lineage():
 
 def test_hard_stop_p3_excluded_from_distillation_absolutely():
     candidates = [
-        DistillationCandidate("c1", PrivacyClass.P3, has_consent=True, redactor_passed=True),
+        DistillationCandidate("c1", PrivacyClass.P0, has_consent=True, redactor_passed=True),
     ]
-    dataset = build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P3)
+    dataset = build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P0)
     assert dataset == frozenset()  # excluded regardless of consent
 
 
 def test_hard_stop_p2_without_consent_excluded_from_distillation():
     candidates = [
-        DistillationCandidate("c1", PrivacyClass.P2, has_consent=False, redactor_passed=True),
-        DistillationCandidate("c2", PrivacyClass.P2, has_consent=True, redactor_passed=False),
+        DistillationCandidate("c1", PrivacyClass.P1, has_consent=False, redactor_passed=True),
+        DistillationCandidate("c2", PrivacyClass.P1, has_consent=True, redactor_passed=False),
     ]
-    dataset = build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P3)
+    dataset = build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P0)
     assert dataset == frozenset()
 
 
 def test_p2_with_consent_and_redactor_pass_is_included():
     candidates = [
-        DistillationCandidate("c1", PrivacyClass.P2, has_consent=True, redactor_passed=True),
-        DistillationCandidate("c2", PrivacyClass.P0),
+        DistillationCandidate("c1", PrivacyClass.P1, has_consent=True, redactor_passed=True),
+        DistillationCandidate("c2", PrivacyClass.P3),
     ]
-    dataset = build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P3)
+    dataset = build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P0)
     assert dataset == frozenset({"c1", "c2"})
 
 
@@ -276,22 +276,22 @@ def test_hard_stop_distillation_export_exceeds_destination_ceiling():
     Even fully-eligible, fully-consented candidates cannot be exported to a
     training destination whose ceiling is below the dataset's resulting
     class. This is the gap the FRDs left open: 'fine-tuning pipeline is out
-    of scope' did not say anything blocks a P2 dataset reaching a vendor's
+    of scope' did not say anything blocks a P1 dataset reaching a vendor's
     fine-tuning API.
     """
     candidates = [
-        DistillationCandidate("c1", PrivacyClass.P2, has_consent=True, redactor_passed=True),
+        DistillationCandidate("c1", PrivacyClass.P1, has_consent=True, redactor_passed=True),
     ]
     with pytest.raises(HardStop) as exc:
-        build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P1)  # too low
+        build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P2)  # too low
     assert exc.value.code == "distillation_export_exceeds_destination_ceiling"
 
 
 def test_distillation_export_succeeds_when_ceiling_covers_dataset():
     candidates = [
-        DistillationCandidate("c1", PrivacyClass.P1, has_consent=True, redactor_passed=True),
+        DistillationCandidate("c1", PrivacyClass.P2, has_consent=True, redactor_passed=True),
     ]
-    dataset = build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P2)
+    dataset = build_dataset(candidates, destination_privacy_ceiling=PrivacyClass.P1)
     assert dataset == frozenset({"c1"})
 
 

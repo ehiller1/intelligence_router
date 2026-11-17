@@ -28,7 +28,7 @@ VLLM = "http://10.0.0.5:8000"
 
 def model(model_id, *, cost=1.0, classes=("contract_review",), endpoint=None):
     return ModelRecord(
-        model_id=model_id, privacy_ceiling=PrivacyClass.P3,
+        model_id=model_id, privacy_ceiling=PrivacyClass.P0,
         lineage=LineageSet.for_base_model("qwen"), cost_per_1k_tokens=cost,
         is_attested=True, attestation_valid_until=NOW + timedelta(days=30),
         supported_classes=frozenset(classes), endpoint=endpoint)
@@ -37,7 +37,7 @@ def model(model_id, *, cost=1.0, classes=("contract_review",), endpoint=None):
 def binding(registry, cls="contract_review", tier=GovernanceTier.COMMODITY, ttl=300.0):
     pool = frozenset(m for m, r in registry.items() if cls in r.supported_classes)
     rc = ReasoningClassRecord(name=cls, default_governance_tier=tier, eligible_model_ids=pool)
-    return build_binding(rc, registry, tier, PrivacyClass.P2, Posture.NORMAL, "gov-v1", ttl,
+    return build_binding(rc, registry, tier, PrivacyClass.P1, Posture.NORMAL, "gov-v1", ttl,
                          now=NOW)
 
 

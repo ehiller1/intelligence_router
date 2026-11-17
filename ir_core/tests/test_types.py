@@ -60,12 +60,19 @@ def test_tighten_empty_raises():
 
 
 # ---------------------------------------------------------------------------
-# R1: may_receive() asserts P3 = most sensitive, and is the ONLY comparison.
+# R1a: may_receive() asserts P0 = most sensitive, and is the ONLY comparison.
 # ---------------------------------------------------------------------------
 
-def test_privacy_ordering_matches_decision_r1():
-    """P0 is least sensitive, P3 is most sensitive (decision R1, 2026-09-20)."""
-    assert PrivacyClass.P0 < PrivacyClass.P1 < PrivacyClass.P2 < PrivacyClass.P3
+def test_privacy_ordering_matches_decision_r1a():
+    """P0 is MOST sensitive, P3 is least (decision R1a, 2026-11-17; R1 had the
+    reverse). Written out label by label so a silent flip fails here."""
+    assert PrivacyClass.P3 < PrivacyClass.P2 < PrivacyClass.P1 < PrivacyClass.P0
+    assert [PrivacyClass[n].value for n in ("P0", "P1", "P2", "P3")] == [3, 2, 1, 0]
+    # the apps' own labels: restricted, confidential, internal, public
+    assert not may_receive(PrivacyClass.P3, PrivacyClass.P0)   # public-only model, restricted data
+    assert not may_receive(PrivacyClass.P2, PrivacyClass.P1)   # internal-cleared, confidential data
+    assert may_receive(PrivacyClass.P1, PrivacyClass.P2)       # confidential-cleared, internal data
+    assert may_receive(PrivacyClass.P0, PrivacyClass.P0)
 
 
 @given(privacy_classes, privacy_classes)
@@ -74,15 +81,16 @@ def test_may_receive_reflexive_and_ordered(ceiling, data):
     assert may_receive(ceiling, data) == (ceiling >= data)
 
 
-def test_may_receive_p3_never_reaches_p0_ceiling():
-    """The MVP FRD's central rule, quoted directly: P3 data never reaches a
-    model whose ceiling is P0 (e.g. an unrestricted frontier API)."""
-    assert may_receive(PrivacyClass.P0, PrivacyClass.P3) is False
+def test_most_sensitive_data_never_reaches_the_lowest_ceiling():
+    """The MVP FRD's central rule, in R1a labels: P0 (most sensitive) data
+    never reaches a model whose ceiling is P3 (e.g. an unrestricted frontier
+    API)."""
+    assert may_receive(PrivacyClass.P3, PrivacyClass.P0) is False
 
 
-def test_may_receive_p3_ceiling_accepts_everything():
+def test_the_highest_ceiling_accepts_everything():
     for data in PrivacyClass:
-        assert may_receive(PrivacyClass.P3, data) is True
+        assert may_receive(PrivacyClass.P0, data) is True
 
 
 # ---------------------------------------------------------------------------

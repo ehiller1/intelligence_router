@@ -37,16 +37,20 @@ class GovernanceTier(IntEnum):
 
 class PrivacyClass(IntEnum):
     """
-    Data sensitivity, P0 (least sensitive) .. P3 (most sensitive).
+    Data sensitivity, P0 (MOST sensitive) .. P3 (least sensitive).
 
-    Decision R1 (2026-09-20): P3 = most sensitive. This is the MVP FRD's
-    original direction; the Adaptive FRD was patched to match (v1.1).
-    Do not compare .value directly outside this module — use may_receive().
+    Decision R1a (2026-11-17) reverses decision R1 (2026-09-20, which had
+    P3 as most sensitive) so that the router, RLDE, the substrate kit and the
+    apps' own stored labels all agree. The integer VALUE is the sensitivity
+    rank, higher = more sensitive, so ordering code is unchanged; only which
+    label has which rank moved: old P0/P1/P2/P3 are now P3/P2/P1/P0.
+
+    Do not compare .value directly outside this module -- use may_receive().
     """
-    P0 = 0
-    P1 = 1
-    P2 = 2
-    P3 = 3
+    P0 = 3   # restricted: raw personal content, government ids, card numbers
+    P1 = 2   # confidential: sensitive operational data about named people
+    P2 = 1   # internal: organization-internal, aggregated or masked
+    P3 = 0   # public: aggregate, anonymized or public
 
 
 class AuthorityTier(IntEnum):
@@ -94,10 +98,11 @@ def tighten_posture(*postures: Posture) -> Posture:
 
 def may_receive(model_ceiling: PrivacyClass, data_class: PrivacyClass) -> bool:
     """
-    The single comparison point for privacy enforcement (decision R1).
+    The single comparison point for privacy enforcement (decisions R1, R1a).
 
     A model may receive data only if its privacy ceiling is at or above the
-    data's class. No other code in this codebase should compare PrivacyClass
+    data's sensitivity (the model has been cleared for data at least that
+    sensitive). No other code in this codebase should compare PrivacyClass
     values directly -- route every such check through this function so the
     ordering direction is asserted in exactly one place.
     """

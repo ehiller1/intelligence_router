@@ -18,11 +18,10 @@ CREATE TABLE ir_model_registry (
     supported_classes           JSONB NOT NULL DEFAULT '[]'::JSONB,
     privacy_ceiling             TEXT NOT NULL
         CHECK (privacy_ceiling IN ('P0', 'P1', 'P2', 'P3')),
-        -- decision R1: P0 least sensitive .. P3 most sensitive. This column
+        -- decision R1a: P0 MOST sensitive .. P3 least sensitive (R1 had the reverse). This column
         -- must only ever be compared through the application-layer
-        -- may_receive() equivalent -- never `privacy_ceiling >= 'P2'` in raw
-        -- SQL, because that relies on lexical ordering matching semantic
-        -- ordering (it happens to, here, but do not rely on it elsewhere).
+        -- may_receive() equivalent -- never `privacy_ceiling <= 'P2'` in raw
+        -- SQL: lexical order is the REVERSE of sensitivity here.
     lineage_base_family         TEXT NOT NULL,
     lineage_set                 JSONB NOT NULL DEFAULT '[]'::JSONB,
     teacher_model_ids           JSONB NOT NULL DEFAULT '[]'::JSONB,

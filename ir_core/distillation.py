@@ -1,9 +1,11 @@
 """
-Distillation privacy gating (decision R1, patched Adaptive FRD §3.4 / §5.10).
+Distillation privacy gating (decisions R1/R1a, patched Adaptive FRD §3.4 / §5.10).
 
 Two hard stops live here:
-  1. P3 content is excluded from distillation candidates absolutely; P2
-     requires explicit consent and a Redactor pass; P0/P1 are unrestricted.
+  1. P0 (most sensitive) content is excluded from distillation candidates
+     absolutely; P1 requires explicit consent and a Redactor pass; P2/P3 are
+     unrestricted. (Decision R1 had these as P3 / P2 / P0,P1; R1a renamed the
+     classes, the rule is unchanged.)
   2. A dataset carries the HIGHEST privacy class of any row in it, and may
      only be exported to a training destination whose privacy ceiling covers
      that class (the export-ceiling rule -- an addition beyond both FRDs,
@@ -30,16 +32,16 @@ class DistillationCandidate:
 
 def candidate_is_eligible(candidate: DistillationCandidate) -> bool:
     """
-    FR-IR-DST-01 gating, privacy direction per decision R1:
-      P0, P1            -> eligible unconditionally
-      P2                 -> eligible only with explicit consent AND a Redactor pass
-      P3                 -> never eligible (hard stop)
+    FR-IR-DST-01 gating, privacy direction per decision R1a (P0 most sensitive):
+      P2, P3            -> eligible unconditionally
+      P1                 -> eligible only with explicit consent AND a Redactor pass
+      P0                 -> never eligible (hard stop)
     """
-    if candidate.privacy_class == PrivacyClass.P3:
+    if candidate.privacy_class == PrivacyClass.P0:
         return False
-    if candidate.privacy_class == PrivacyClass.P2:
+    if candidate.privacy_class == PrivacyClass.P1:
         return candidate.has_consent and candidate.redactor_passed
-    return True  # P0, P1
+    return True  # P2, P3
 
 
 def dataset_privacy_class(candidates: "list[DistillationCandidate]") -> PrivacyClass:

@@ -26,6 +26,8 @@ themselves; loosening is always a human act. See `docs/TRUST_ARCHITECTURE.md`
 
 **MVP-0 complete, plus a minimal dispatch: 126/126 tests passing.**
 
+**Privacy scale (decision R1a): P0 is the MOST sensitive class, P3 the least.** Earlier text and the FRD .docx files use the reverse (R1); see `docs/IMPLEMENTATION_PLAN.md`.
+
 - `ir_dispatch` (minimal, ahead of MVP-1) — takes an `EligibilityBinding`,
   drops eligible models that have no `ServingEndpoint`, selects over the rest
   with the existing `apply_override` / lowest-cost rule, and makes one
